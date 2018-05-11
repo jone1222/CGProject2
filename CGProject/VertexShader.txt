@@ -1,0 +1,22 @@
+#version 400 core
+
+//이곳에 전역변수 삽입
+//float x,y,z; (qualifier가 잇어야만 건드릴 수 있따)
+
+in vec3 pos;
+in float pSize;
+
+in vec3 iColor;
+out vec3 oColor;
+
+uniform mat4 rot;
+uniform mat4 move;
+
+
+void main()
+{
+    gl_Position = move*rot*vec4(pos, 1.0);
+    //gl_PointSize = pSize;
+	gl_PointSize = 20.0;
+	oColor = iColor;
+}
