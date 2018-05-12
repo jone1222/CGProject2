@@ -22,6 +22,13 @@ using namespace std;
 
 #define max(a,b)            (((a) > (b)) ? (a) : (b))
 
+#define X_DIR 1
+#define Y_DIR 2
+#define Z_DIR 3
+
+#define PLUS 1
+#define MINUS 2
+
 GLuint g_programID;
 
 
@@ -31,6 +38,7 @@ GLuint VertexArrayID_2;
 
 GLuint IndexBufferID;
 
+float unit_z_length = 0.5;
 
 vector<float> g_vertices;
 
@@ -40,6 +48,7 @@ vector<byte*> g_indices;
 bool is2D = true;
 bool is3D = false;
 
+vector<glm::mat4x4> mat_vec;
 
 glm::mat4 M;
 //x 로 -0.5 이동한 행렬
@@ -74,6 +83,35 @@ int y_rotate_count = 0;
 vector<byte> LineLoopToUnitObj();
 
 vector<byte> indices;
+
+//Cube
+float vtxData[] = {
+	0.2 , 0.2 , 0.2 , 0.0 , 0.0 , 0.0 ,
+	-0.2, 0.2 , 0.2 , 0.0 , 0.0 , 1.0 ,
+	-0.2,-0.2 , 0.2 , 0.0 , 1.0 , 0.0 ,
+	0.2 ,-0.2 , 0.2 , 0.0 , 1.0 , 1.0 ,
+	0.2 ,-0.2 ,-0.2 , 1.0 , 0.0 , 0.0 ,
+	0.2 , 0.2 ,-0.2 , 1.0 , 0.0 , 1.0 ,
+	-0.2, 0.2 ,-0.2 , 1.0 , 1.0 , 0.0 ,
+	-0.2,-0.2 ,-0.2 , 1.0 , 1.0 , 1.0
+};
+
+
+byte idxData[] = {
+	0,1,2,
+	0,2,3,
+	0,3,4,
+	0,4,5,
+	0,5,1,
+	1,5,6,
+	1,6,7,
+	1,7,2,
+	2,3,4,
+	2,4,7,
+	4,7,6,
+	4,6,5
+};
+
 
 GLuint LoadShaders(const char* vertex_file_path, const char* fragment_file_path)
 {
@@ -155,11 +193,36 @@ GLuint LoadShaders(const char* vertex_file_path, const char* fragment_file_path)
 	return ProgramID;
 }
 
-void rotate() {
-	glm::mat4 x_mat_rotate = glm::rotate(glm::mat4(), glm::radians(10.0f * x_rotate_count), glm::vec3(1, 0, 0));//x축 기준 90도 돌리겠다
-	glm::mat4 y_mat_rotate = glm::rotate(glm::mat4(), glm::radians(10.0f * y_rotate_count), glm::vec3(0, 1, 0));
-	M = glm::matrixCompMult(x_mat_rotate, y_mat_rotate);
+void changeUnitLength(int dir) {
+	if (is3D) {
+		
+		if (dir == PLUS)
+			unit_z_length += 0.2;
+		else
+			unit_z_length -= 0.2;
+		for (int i = (g_vertices.size()-12) / 2 + 2; i < g_vertices.size() - 12; i += 6) {
+			g_vertices.at(i) = unit_z_length;
+		}
+		g_vertices.at(g_vertices.size() - 1 - 3) = unit_z_length;
+	}
+}
+void Addtessel() {
 
+}
+
+void rotate(int direction, int sign) {
+	switch (direction) {
+	case X_DIR:
+		M *= glm::rotate(glm::mat4(), glm::radians(sign * 10.0f), glm::vec3(1, 0, 0));
+		break;
+	case Y_DIR:
+		M *= glm::rotate(glm::mat4(), glm::radians(sign * 10.0f), glm::vec3(0, 1, 0));
+		break;
+	case Z_DIR:
+		M *= glm::rotate(glm::mat4(), glm::radians(sign * 10.0f), glm::vec3(0, 0, 1));
+		break;
+	}
+	
 }
 void rotate(float ax_x, float ax_y, float ax_z) {
 
@@ -227,6 +290,10 @@ void myMouse(int button, int state, int x, int y) {
 
 		glutPostRedisplay(); //새로 다시 그리기
 	}
+	else if ((button == GLUT_RIGHT_BUTTON) && (state == GLUT_DOWN)) {
+		is2D = false;
+		glutPostRedisplay();
+	}
 }
 
 void renderScene(void)
@@ -253,7 +320,7 @@ void renderScene(void)
 	
 	//2D Line Loop
 	if (is2D) {
-		glBufferData(GL_ARRAY_BUFFER, sizeof(float)*g_vertices.size(), g_vertices.data(), GL_DYNAMIC_DRAW);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(float)*g_vertices.size(), g_vertices.data(), GL_STATIC_DRAW);
 		glDrawArrays(GL_LINE_LOOP, 0, (g_vertices.size() / 6));
 	}
 	else {
@@ -262,8 +329,12 @@ void renderScene(void)
 			indices = LineLoopToUnitObj();
 			is3D = true;
 		}
+		glBufferData(GL_ARRAY_BUFFER, sizeof(float)*g_vertices.size(), g_vertices.data(), GL_STATIC_DRAW);
 		glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(byte) * indices.size(), indices.data(), GL_STATIC_DRAW);
-		glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_BYTE, 0);
+		/*glBufferData(GL_ARRAY_BUFFER, sizeof(float)*6*8, vtxData, GL_STATIC_DRAW);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(byte) * 3 * 2 * 6, idxData, GL_STATIC_DRAW);*/
+		glDrawElements(GL_TRIANGLES, sizeof(byte) * indices.size(), GL_UNSIGNED_BYTE, 0);
+		/*glDrawElements(GL_TRIANGLES, sizeof(byte) * 3 * 2 * 6, GL_UNSIGNED_BYTE, 0);*/
 	}
 	//glUniformMatrix4fv(moveLoc, 1, GL_FALSE, iMat);
 
@@ -281,7 +352,7 @@ vector<byte> LineLoopToUnitObj() {
 	for (int i = 0; i < initial_size; i += 6) {
 		g_vertices.push_back(g_vertices.at(i));
 		g_vertices.push_back(g_vertices.at(i + 1));
-		g_vertices.push_back(g_vertices.at(i + 2) + 0.5);
+		g_vertices.push_back(g_vertices.at(i + 2) + unit_z_length);
 		g_vertices.push_back(g_vertices.at(i + 3));
 		g_vertices.push_back(g_vertices.at(i + 4));
 		g_vertices.push_back(g_vertices.at(i + 5));
@@ -307,7 +378,7 @@ vector<byte> LineLoopToUnitObj() {
 
 	g_vertices.push_back(avg_x);
 	g_vertices.push_back(avg_y);
-	g_vertices.push_back(0.1);
+	g_vertices.push_back(unit_z_length);
 	g_vertices.push_back(0);
 	g_vertices.push_back(0);
 	g_vertices.push_back(0);
@@ -320,19 +391,19 @@ vector<byte> LineLoopToUnitObj() {
 	for (int i = 0; i < polygon_level-1; i ++) {
 		indices.push_back(i);
 		indices.push_back(i + 1);
-		indices.push_back(g_vertices.size()-2);
+		indices.push_back(polygon_level * 2);
 	}
-	indices.push_back(polygon_level);
+	indices.push_back(polygon_level - 1);
 	indices.push_back(0);
-	indices.push_back(g_vertices.size() - 2);
+	indices.push_back(polygon_level * 2);
 	//back indice
-	for (int i = polygon_level+1; i < polygon_level * 2 - 1; i++) {
+	for (int i = polygon_level; i < polygon_level * 2 - 1; i++) {
 		indices.push_back(i);
-		indices.push_back(g_vertices.size()-1);
+		indices.push_back(polygon_level * 2 + 1);
 		indices.push_back(i + 1);
 	}
 	indices.push_back(polygon_level * 2 -1);
-	indices.push_back(g_vertices.size() - 1);
+	indices.push_back(polygon_level * 2 +1);
 	indices.push_back(polygon_level);
 	//side indice
 	for (int i = 0; i < polygon_level - 1; i++) {
@@ -376,26 +447,23 @@ void init()
 
 
 	glEnable(GL_DEPTH_TEST);	//뎁스 활성화
+	glDepthFunc(GL_LESS);
 								//glDepthRange(-0.1, 1.0);
 								//glDepthFunc(GL_GREATER);
 }
 
 void specialKey(int key, int x, int y) {  
 	switch (key) {
-	case GLUT_KEY_ALT_L:
-		is2D = !is2D;
+	case GLUT_KEY_LEFT: rotate(Y_DIR,-1);
 		break;
-	case GLUT_KEY_LEFT: --y_rotate_count;
+	case GLUT_KEY_RIGHT: rotate(Y_DIR,1);
 		break;
-	case GLUT_KEY_RIGHT: ++y_rotate_count;
+	case GLUT_KEY_UP: rotate(X_DIR,1);
 		break;
-	case GLUT_KEY_UP: ++x_rotate_count;
-		break;
-	case GLUT_KEY_DOWN: --x_rotate_count;
+	case GLUT_KEY_DOWN: rotate(X_DIR,-1);
 		break;
 	}
-	if (key == GLUT_KEY_LEFT || key == GLUT_KEY_RIGHT || key == GLUT_KEY_UP || key == GLUT_KEY_DOWN)
-		rotate();
+
 
 	glutPostRedisplay();
 }  
@@ -434,8 +502,12 @@ void myKey(unsigned char key, int x, int y) {
 		break;
 	case 'v':matv[1][14] += 0.1;
 		break;
-
 	}
+
+	if (key == '+')
+		changeUnitLength(PLUS);
+	else if (key == '-')
+		changeUnitLength(MINUS);
 
 	glutPostRedisplay();
 }
@@ -470,33 +542,7 @@ void main(int argc, char **argv)
 	g_programID = LoadShaders("VertexShader.txt", "FragmentShader.txt");
 	glUseProgram(g_programID);
 
-	//Cube
-	/*float vtxData[] = {
-		0.2 , 0.2 , 0.2 , 0.0 , 0.0 , 0.0 ,
-		-0.2, 0.2 , 0.2 , 0.0 , 0.0 , 1.0 ,
-		-0.2,-0.2 , 0.2 , 0.0 , 1.0 , 0.0 ,
-		0.2 ,-0.2 , 0.2 , 0.0 , 1.0 , 1.0 ,
-		0.2 ,-0.2 ,-0.2 , 1.0 , 0.0 , 0.0 ,
-		0.2 , 0.2 ,-0.2 , 1.0 , 0.0 , 1.0 ,
-		-0.2, 0.2 ,-0.2 , 1.0 , 1.0 , 0.0 ,
-		-0.2,-0.2 ,-0.2 , 1.0 , 1.0 , 1.0
-	};*/
-
-
-	/*byte idxData[] = {
-		0,1,2,
-		0,2,3,
-		0,3,4,
-		0,4,5,
-		0,5,1,
-		1,5,6,
-		1,6,7,
-		1,7,2,
-		2,3,4,
-		2,4,7,
-		4,7,6,
-		4,6,5
-	};*/
+	
 
 	//g_indices.push_back(idxData);
 
