@@ -37,6 +37,9 @@ vector<float> g_vertices;
 
 vector<byte*> g_indices;
 
+bool is2D = true;
+bool is3D = false;
+
 
 glm::mat4 M;
 //x 로 -0.5 이동한 행렬
@@ -45,7 +48,7 @@ GLfloat matv[2][16] = {
 		1, 0, 0, 0,
 		0, 1, 0, 0,
 		0, 0, 1, 0,
-		-0.5, 0, 0, 1
+		0, 0, 0, 1
 	},
 	{
 		1, 0, 0, 0,
@@ -64,6 +67,13 @@ GLfloat iMat[] = {
 
 bool isAxisRotate = false;
 bool isMoved[2] = { false, false };
+
+int x_rotate_count = 0;
+int y_rotate_count = 0;
+
+vector<byte> LineLoopToUnitObj();
+
+vector<byte> indices;
 
 GLuint LoadShaders(const char* vertex_file_path, const char* fragment_file_path)
 {
@@ -145,9 +155,19 @@ GLuint LoadShaders(const char* vertex_file_path, const char* fragment_file_path)
 	return ProgramID;
 }
 
+void rotate() {
+	glm::mat4 x_mat_rotate = glm::rotate(glm::mat4(), glm::radians(10.0f * x_rotate_count), glm::vec3(1, 0, 0));//x축 기준 90도 돌리겠다
+	glm::mat4 y_mat_rotate = glm::rotate(glm::mat4(), glm::radians(10.0f * y_rotate_count), glm::vec3(0, 1, 0));
+	M = glm::matrixCompMult(x_mat_rotate, y_mat_rotate);
+
+}
 void rotate(float ax_x, float ax_y, float ax_z) {
 
-	glm::vec3 x, xp, y, z;
+	
+	//glUniformMatrix4fv(rotateLoc, 1, GL_FALSE, &mat_rotate[0][0]);
+
+
+	/*glm::vec3 x, xp, y, z;
 
 	z = glm::vec3(ax_x, ax_y, ax_z);
 	z = glm::normalize(z);
@@ -155,11 +175,25 @@ void rotate(float ax_x, float ax_y, float ax_z) {
 	y = glm::cross(z, xp);
 	x = glm::cross(y, z);
 
+	y = glm::normalize(y);
+	x = glm::normalize(x);
+
 	M[0] = glm::vec4(x, 0);
 	M[1] = glm::vec4(y, 0);
 	M[2] = glm::vec4(z, 0);
-	M[3] = glm::vec4(0, 0, 0, 1);
+	M[3] = glm::vec4(0, 0, 0, 1);*/
 
+
+	//glm::vec3 Z = glm::vec3(nx, ny,nx+ny);//바라보는 방향?
+	//Z= glm::normalize(Z);
+	//glm::vec3 Xp = glm::vec3(1, 1, 1);//도는 기준 선
+	//glm::vec3 Y = glm::cross(Z,Xp);
+	//glm::vec3 X = glm::cross(Y, Z);
+	//Y = glm::normalize(Y);
+	//X= glm::normalize(X);
+	//glm::mat4 glmatRotate = glm::mat4 (glm::vec4(X, 0), glm::vec4(Y, 0), glm::vec4(Z, 0), glm::vec4(0, 0, 0, 1));
+	//GLuint rotateLoc = glGetUniformLocation(g_programID, "rotate");
+	//glUniformMatrix4fv(rotateLoc, 1, GL_FALSE, &glmatRotate[0][0]);
 }
 
 void myMouse(int button, int state, int x, int y) {
@@ -176,29 +210,20 @@ void myMouse(int button, int state, int x, int y) {
 		nx = 2.0 * (float)x / (float)479 - 1.0;
 		ny = -2.0 * (float)y / (float)479 + 1.0;
 
-		//GLuint posLoc;
-
-		//posLoc = glGetAttribLocation(g_programID, "pos");
-		//glVertexAttrib3f(posLoc, nx, ny, 0.0);
-
-
 		r = (rand() % 100) / 99.f;
 		g = (rand() % 100) / 99.f;
 		b = (rand() % 100) / 99.f;
-		//GLuint colLoc = glGetUniformLocation(g_programID, "mCol");
-		//glUniform3f(colLoc, r, g, b);
-		/*g_vertices.push_back(nx);
-		g_vertices.push_back(ny);
-		g_vertices.push_back(0.0);
-		g_vertices.push_back(r);
-		g_vertices.push_back(g);
-		g_vertices.push_back(b);
-
-		glBindBuffer(GL_ARRAY_BUFFER, VertexBufferID[0]);
-		glBufferData(GL_ARRAY_BUFFER, sizeof(float)*g_vertices.size(), g_vertices.data(), GL_DYNAMIC_DRAW);
-		*/
-		rotate(nx, ny, 0);
-		isAxisRotate = true;
+		
+		if (is2D) {
+			g_vertices.push_back(nx);
+			g_vertices.push_back(ny);
+			g_vertices.push_back(0);
+			g_vertices.push_back(r);
+			g_vertices.push_back(g);
+			g_vertices.push_back(b);
+		}
+		//rotate(nx, ny, 0);
+		//isAxisRotate = true;
 
 		glutPostRedisplay(); //새로 다시 그리기
 	}
@@ -207,9 +232,6 @@ void myMouse(int button, int state, int x, int y) {
 void renderScene(void)
 {
 	//입력받은 곳에 출력하기 ( vertex shader와 통신)
-	//	GLuint posLoc;
-	//	posLoc = glGetAttribLocation(g_programID, "pos");
-	//	glVertexAttrib3f(posLoc, -0.5, 0.5, 0.0);
 
 	//Clear all pixels
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -218,63 +240,121 @@ void renderScene(void)
 
 	glBindVertexArray(VertexArrayID);
 
-
-	//glBindBuffer(GL_ARRAY_BUFFER, VertexBufferID[1]);
-	//GLuint sizeLoc;
-	//sizeLoc = glGetAttribLocation(g_programID, "pSize");
-	////glVertexAttribPointer(sizeLoc, 1, GL_FLOAT, GL_FALSE, sizeof(GLfloat)*4, (void*)(sizeof(GLfloat)*3));
-	//glBindBuffer(GL_ARRAY_BUFFER, VertexBufferID[1]);
-	//glVertexAttribPointer(sizeLoc, 1, GL_FLOAT, GL_FALSE, 0, (void*)(0));
-	//glEnableVertexAttribArray(sizeLoc);
-
-
-	//glDrawArrays(GL_POINTS, 0, 2);
-	/*if(g_vertices.size() != 0)
-	glDrawArrays(GL_TRIANGLES, 0, (g_vertices.size()/6));*/
-
+	
+	//회전
 	GLuint axisLoc = glGetUniformLocation(g_programID, "rot");
-	/*if (!isAxisRotate)
-	glUniformMatrix4fv(axisLoc, 1, GL_FALSE, iMat);
-	else */
 	glUniformMatrix4fv(axisLoc, 1, GL_FALSE, &M[0][0]);
 
 
 	GLuint moveLoc = glGetUniformLocation(g_programID, "move");
 	GLuint colLoc = glGetAttribLocation(g_programID, "iColor");
-	{
-		//glUniformMatrix4fv(moveLoc, 1, GL_FALSE, matv[0]);
-		glUniformMatrix4fv(moveLoc, 1, GL_FALSE, iMat);
-
-		/*if (isMoved[0]) {
-		glDisableVertexAttribArray(colLoc);
-		glVertexAttrib3f(colLoc, 1.0, 0.0, 0.0);
-		}
-		else
-		glEnableVertexAttribArray(colLoc);*/
-		//glDrawArrays(GL_TRIANGLES, 0, 36);
-		glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_BYTE, 0);
+	
+	glUniformMatrix4fv(moveLoc, 1, GL_FALSE, matv[0]);
+	
+	//2D Line Loop
+	if (is2D) {
+		glBufferData(GL_ARRAY_BUFFER, sizeof(float)*g_vertices.size(), g_vertices.data(), GL_DYNAMIC_DRAW);
+		glDrawArrays(GL_LINE_LOOP, 0, (g_vertices.size() / 6));
 	}
+	else {
 
-	{
-
-		//glUniformMatrix4fv(moveLoc, 1, GL_FALSE, matv[1]);
-		/*if (isMoved[1]) {
-		glDisableVertexAttribArray(colLoc);
-		glVertexAttrib3f(colLoc, 1.0, 0.0, 0.0);
+		if (!is3D) {
+			indices = LineLoopToUnitObj();
+			is3D = true;
 		}
-		else
-		glEnableVertexAttribArray(colLoc);*/
-
-		//glDrawArrays(GL_TRIANGLES, 0, 36);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(byte) * indices.size(), indices.data(), GL_STATIC_DRAW);
+		glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_BYTE, 0);
 	}
+	//glUniformMatrix4fv(moveLoc, 1, GL_FALSE, iMat);
 
-	/*
-	glBindVertexArray(VertexArrayID_2);
-	glUniformMatrix4fv(moveLoc, 1, GL_FALSE, iMat);
-	glDrawArrays(GL_TRIANGLES, 0, 3);
-	*/
+	//glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_BYTE, 0);
+	
+
 	//Double buffer
 	glutSwapBuffers();
+}
+
+vector<byte> LineLoopToUnitObj() {
+	int polygon_level = g_vertices.size() / 6;
+	int initial_size = g_vertices.size();
+	//create back area
+	for (int i = 0; i < initial_size; i += 6) {
+		g_vertices.push_back(g_vertices.at(i));
+		g_vertices.push_back(g_vertices.at(i + 1));
+		g_vertices.push_back(g_vertices.at(i + 2) + 0.5);
+		g_vertices.push_back(g_vertices.at(i + 3));
+		g_vertices.push_back(g_vertices.at(i + 4));
+		g_vertices.push_back(g_vertices.at(i + 5));
+		
+	}
+
+	//calculate center of front and back (average)
+	float total_x = 0;
+	float total_y = 0;
+	for (int i = 0; i < initial_size; i += 6) {
+		total_x += g_vertices.at(i);
+		total_y += g_vertices.at(i + 1);
+	}
+	float avg_x = total_x/(float)polygon_level;
+	float avg_y = total_y/(float)polygon_level;
+
+	g_vertices.push_back(avg_x);
+	g_vertices.push_back(avg_y);
+	g_vertices.push_back(0);
+	g_vertices.push_back(0);
+	g_vertices.push_back(0);
+	g_vertices.push_back(0);
+
+	g_vertices.push_back(avg_x);
+	g_vertices.push_back(avg_y);
+	g_vertices.push_back(0.1);
+	g_vertices.push_back(0);
+	g_vertices.push_back(0);
+	g_vertices.push_back(0);
+
+	vector<byte> indices;
+
+	//create indices
+
+	//front indice
+	for (int i = 0; i < polygon_level-1; i ++) {
+		indices.push_back(i);
+		indices.push_back(i + 1);
+		indices.push_back(g_vertices.size()-2);
+	}
+	indices.push_back(polygon_level);
+	indices.push_back(0);
+	indices.push_back(g_vertices.size() - 2);
+	//back indice
+	for (int i = polygon_level+1; i < polygon_level * 2 - 1; i++) {
+		indices.push_back(i);
+		indices.push_back(g_vertices.size()-1);
+		indices.push_back(i + 1);
+	}
+	indices.push_back(polygon_level * 2 -1);
+	indices.push_back(g_vertices.size() - 1);
+	indices.push_back(polygon_level);
+	//side indice
+	for (int i = 0; i < polygon_level - 1; i++) {
+		indices.push_back( i );
+		indices.push_back( i + polygon_level );
+		indices.push_back( (i + 1) + polygon_level );
+
+		indices.push_back( i );
+		indices.push_back((i + 1) + polygon_level);
+		indices.push_back( i + 1 );
+	}
+	indices.push_back(polygon_level - 1);
+	indices.push_back(polygon_level * 2 - 1);
+	indices.push_back(polygon_level);
+
+	indices.push_back(polygon_level - 1);
+	indices.push_back(polygon_level);
+	indices.push_back(0);
+
+	
+	return indices;
+
 }
 
 
@@ -299,7 +379,28 @@ void init()
 								//glDepthRange(-0.1, 1.0);
 								//glDepthFunc(GL_GREATER);
 }
+
+void specialKey(int key, int x, int y) {  
+	switch (key) {
+	case GLUT_KEY_ALT_L:
+		is2D = !is2D;
+		break;
+	case GLUT_KEY_LEFT: --y_rotate_count;
+		break;
+	case GLUT_KEY_RIGHT: ++y_rotate_count;
+		break;
+	case GLUT_KEY_UP: ++x_rotate_count;
+		break;
+	case GLUT_KEY_DOWN: --x_rotate_count;
+		break;
+	}
+	if (key == GLUT_KEY_LEFT || key == GLUT_KEY_RIGHT || key == GLUT_KEY_UP || key == GLUT_KEY_DOWN)
+		rotate();
+
+	glutPostRedisplay();
+}  
 void myKey(unsigned char key, int x, int y) {
+	
 	if (key == 'q' || key == 'w' || key == 'a' || key == 's' || key == 'z' || key == 'x') {
 		isMoved[0] = true;
 		isMoved[1] = false;
@@ -369,32 +470,20 @@ void main(int argc, char **argv)
 	g_programID = LoadShaders("VertexShader.txt", "FragmentShader.txt");
 	glUseProgram(g_programID);
 
-	//float vertices[] = { -0.5, -0.3, 0.0, 0.2, 0.7, 0.0 };
-	//float sizes[] = { 10.0, 20.0, 30.0 };
-	//float vtxData[] = { -0.5, -0.3, 0.0, 0.3, 0.2, 0.1, 0.2, 0.7, 0.0, 0.7, 0.8, 0.9 };
-	//float vtxData[] = { -0.5, 0.0, 0.5, 1.0, 0.0, 0.0, 
-	//					0.5, 0.0, 0.5, 1.0, 0.0, 0.0,
-	//					0.0, 0.5, 0.5, 1.0, 0.0, 0.0,
-	//	0.0, 0.1, 0.0, 0.0, 1.0, 0.0,
-	//	0.8, 0.1, 0.0, 0.0, 1.0, 0.0,
-	//	0.4, 0.8, 0.0, 0.0, 1.0, 0.0,
-	//	0.0,-0.5, 0.3, 0.0, 0.0, 1.0,
-	//	0.8,-0.5, 0.3, 0.0, 0.0, 1.0,
-	//	0.4, 0.0, 0.3, 0.0, 0.0, 1.0,
-	//};		//z값을 바꾸더라도 , 그리는 순서는 바뀌지 않는다
+	//Cube
+	/*float vtxData[] = {
+		0.2 , 0.2 , 0.2 , 0.0 , 0.0 , 0.0 ,
+		-0.2, 0.2 , 0.2 , 0.0 , 0.0 , 1.0 ,
+		-0.2,-0.2 , 0.2 , 0.0 , 1.0 , 0.0 ,
+		0.2 ,-0.2 , 0.2 , 0.0 , 1.0 , 1.0 ,
+		0.2 ,-0.2 ,-0.2 , 1.0 , 0.0 , 0.0 ,
+		0.2 , 0.2 ,-0.2 , 1.0 , 0.0 , 1.0 ,
+		-0.2, 0.2 ,-0.2 , 1.0 , 1.0 , 0.0 ,
+		-0.2,-0.2 ,-0.2 , 1.0 , 1.0 , 1.0
+	};*/
 
-	float vtxData[] = {
-		0.2,0.2,0.2,0.0,0.0,0.0,
-		-0.2,0.2,0.2,0.0,0.0,1.0,
-		-0.2,-0.2,0.2,0.0,1.0,0.0,
-		0.2,-0.2,0.2,0.0,1.0,1.0,
-		0.2,-0.2,-0.2,1.0,0.0,0.0,
-		0.2,0.2,-0.2,1.0,0.0,1.0,
-		-0.2,0.2,-0.2,1.0,1.0,0.0,
-		-0.2,-0.2,-0.2,1.0,1.0,1.0
-	};
 
-	byte idxData[] = {
+	/*byte idxData[] = {
 		0,1,2,
 		0,2,3,
 		0,3,4,
@@ -407,9 +496,9 @@ void main(int argc, char **argv)
 		2,4,7,
 		4,7,6,
 		4,6,5
-	};
+	};*/
 
-	g_indices.push_back(idxData);
+	//g_indices.push_back(idxData);
 
 
 	//Create Vertex Buffer
@@ -427,47 +516,23 @@ void main(int argc, char **argv)
 
 
 	//Color
-	//GLuint colLoc = glGetUniformLocation(g_programID, "mCol");
-	//glUniform3f(colLoc, 0.0, 1.0, 0.0);
 	GLuint colLoc = glGetAttribLocation(g_programID, "iColor");
 	glVertexAttribPointer(colLoc, 3, GL_FLOAT, GL_FALSE, sizeof(GLfloat) * 6, (void*)(sizeof(GLfloat) * 3));
 	glEnableVertexAttribArray(colLoc);
 
 	//glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 6 * 36, vtxData, GL_DYNAMIC_DRAW);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 6 * 8, vtxData, GL_STATIC_DRAW);
+	//glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 6 * 8, vtxData, GL_STATIC_DRAW);
 
 
 	//Create Index Buffer & Bind
 	glGenBuffers(1, &IndexBufferID);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IndexBufferID);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(byte) * 3 * 12, idxData, GL_STATIC_DRAW);
-
-
-
-	//glBindBuffer(GL_ARRAY_BUFFER, VertexBufferID[1]);
-	//glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 2, sizes, GL_DYNAMIC_DRAW);
-
-	glBindVertexArray(VertexArrayID_2);
-
-	float triangle_data[] = {
-		-0.2, 0.0, 0.0, 1.0, 0.0, 0.0,
-		0.2, 0.0, 0.0, 1.0, 0.0, 0.0,
-		0.0, 0.5, 0.0, 1.0, 0.0, 0.0
-	};
-	glBindBuffer(GL_ARRAY_BUFFER, VertexBufferID[1]);
-	posLoc = glGetAttribLocation(g_programID, "pos");
-	glVertexAttribPointer(posLoc, 3, GL_FLOAT, GL_FALSE, sizeof(GLfloat) * 6, (void*)(0));
-	glEnableVertexAttribArray(posLoc);
-
-	colLoc = glGetAttribLocation(g_programID, "iColor");
-	glVertexAttribPointer(colLoc, 3, GL_FLOAT, GL_FALSE, sizeof(GLfloat) * 6, (void*)(sizeof(GLfloat) * 3));
-	glEnableVertexAttribArray(colLoc);
-
-	glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 6 * 3, triangle_data, GL_DYNAMIC_DRAW);
+	
 
 
 	glutMouseFunc(myMouse);	//마우스 콜백 등록
 	glutKeyboardFunc(myKey);
+	glutSpecialFunc(specialKey);
 
 	glutDisplayFunc(renderScene);
 
