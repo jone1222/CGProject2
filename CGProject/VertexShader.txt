@@ -13,6 +13,8 @@ uniform mat4 rot;
 uniform mat4 move;
 uniform mat4 scale;
 
+in mat4 unit_rule;
+
 void main()
 {
     gl_Position = move*rot*scale*vec4(pos, 2.0);

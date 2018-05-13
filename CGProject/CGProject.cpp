@@ -90,7 +90,7 @@ int y_rotate_count = 0;
 
 int tesselLevel = 0;
 
-int scale = 1;
+float scale = 1;
 int polygon_level = 0;
 
 
@@ -127,6 +127,8 @@ byte idxData[] = {
 	4,7,6,
 	4,6,5
 };
+
+glm::mat4 ruleMat;
 
 vector<float> vertices2Dto3D(vector<float> g_vertices);
 
@@ -214,25 +216,26 @@ void changeUnitLength(int dir) {
 	if (is3D) {
 		if (dir == PLUS)
 			unit_z_length += 0.2;
-		else
+		else if(unit_z_length > 0.5)
 			unit_z_length -= 0.2;
-		for (int i = (g_vertices.size() - 12) / 2 + 2; i < g_vertices.size() - 12; i += 6) {
-			g_vertices.at(i) = unit_z_length;
+		for (int i = (tesselVec.at(0).size() - 12) / 2 + 2; i < tesselVec.at(0).size() - 12; i += 6) {
+			tesselVec.at(0).at(i) = unit_z_length;
 		}
-		g_vertices.at(g_vertices.size() - 1 - 3) = unit_z_length;
+		tesselVec.at(0).at(tesselVec.at(0).size() - 1 - 3) = unit_z_length;
 	}
 }
 void Addtessel() {
 
+	ruleMat = glm::translate(glm::mat4(), glm::vec3(0, 0, unit_z_length));
+	//ruleMat = glm::rotate(ruleMat, 30.0f, glm::vec3(0, 1, 0));
 
-	glm::mat4 moveMat = glm::translate(glm::mat4(), glm::vec3(0, 0, unit_z_length));
 	vector<float> new_vertices;
 
 	int last = tesselVec.size() - 1;
 
 	for (int i = 0; i < polygon_level * 6 * 2 + 12; i += 6) {
 		glm::vec4 target = glm::vec4(tesselVec.at(last).at(i), tesselVec.at(last).at(i+1), tesselVec.at(last).at(i+2), 1);
-		glm::vec4 transvec = moveMat * target;
+		glm::vec4 transvec = ruleMat * target;
 		new_vertices.push_back(transvec[0]);
 		new_vertices.push_back(transvec[1]);
 		new_vertices.push_back(transvec[2]);
@@ -242,39 +245,7 @@ void Addtessel() {
 		new_vertices.push_back(tesselVec.at(last).at(i + 5));
 
 	}
-	////후면 정보 복사
-	//for (int i = polygon_level * 6; i < polygon_level * 2 * 6; i ++){
-	//	new_vertices.push_back(tesselVec.at(last).at(i));
-	//}
-	//
-	////후면 정보를 앞면으로 하여 후면 생성
-	//for (int i = 0; i < polygon_level * 6; i+= 6) {
-	//	glm::vec4 target = glm::vec4(new_vertices.at(i), new_vertices.at(i+1), new_vertices.at(i+2), 1);
-	//	glm::vec4 transvec = moveMat * target;
-	//	new_vertices.push_back(transvec[0]);
-	//	new_vertices.push_back(transvec[1]);
-	//	new_vertices.push_back(transvec[2]);
-
-	//	new_vertices.push_back(new_vertices.at(i + 3));
-	//	new_vertices.push_back(new_vertices.at(i + 4));
-	//	new_vertices.push_back(new_vertices.at(i + 5));
-	//}
-
-	////calculate center of front and back (average)
-	////기존 후면 average
-	//for (int i = polygon_level * 2 * 6; i < ( polygon_level * 2 * 6 )+ 6; i++) {
-	//	new_vertices.push_back(tesselVec.at(last).at(i));
-	//}
-	////후면 average로 부터 이동된 새로운 후면 average
-	//glm::vec4 target = glm::vec4(new_vertices.at(polygon_level * 2 * 6), new_vertices.at(polygon_level * 2 * 6 + 1), new_vertices.at(polygon_level * 2 * 6 + 2), 1);
-	//glm::vec4 transvec = moveMat * target;
-	//new_vertices.push_back(transvec[0]);
-	//new_vertices.push_back(transvec[1]);
-	//new_vertices.push_back(transvec[2]);
-	//new_vertices.push_back(0);
-	//new_vertices.push_back(0);
-	//new_vertices.push_back(0);
-
+	
 	tesselVec.push_back(new_vertices);
 	glutPostRedisplay();
 }
@@ -286,11 +257,12 @@ void RemoveTessel() {
 }
 void scaling(int sign) {
 	if (sign == 0)
-		scale++;
-	else if(scale > 1)
-		scale--;
+		scale *= 2;
+	else
+		scale /= 2;
 	
 	scaleM = glm::scale(glm::mat4(), glm::vec3(scale, scale, scale));
+
 }
 void translation(int direction) {
 	glm::mat4 move;
@@ -370,8 +342,8 @@ void myMouse(int button, int state, int x, int y) {
 	if ((button == GLUT_LEFT_BUTTON) && (state == GLUT_DOWN)) {
 		float nx, ny;
 
-		nx = 2.0 * (float)x / (float)479 - 1.0;
-		ny = -2.0 * (float)y / (float)479 + 1.0;
+		nx = 2 * (2.0 * (float)x / (float)479 - 1.0);
+		ny = 2 * (-2.0 * (float)y / (float)479 + 1.0);
 
 		r = (rand() % 100) / 99.f;
 		g = (rand() % 100) / 99.f;
@@ -464,13 +436,19 @@ vector<float> vertices2Dto3D(vector<float> g_vertices) {
 	}
 
 
+	ruleMat = glm::translate(glm::mat4(), glm::vec3(0, 0, unit_z_length));
+	//ruleMat = glm::rotate(ruleMat, 30.0f, glm::vec3(0, 1, 0));
 	polygon_level = g_vertices.size() / 6;
 	int initial_size = g_vertices.size();
+
 	//create back area
 	for (int i = 0; i < initial_size; i += 6) {
-		vertices_3D.push_back(g_vertices.at(i));
-		vertices_3D.push_back(g_vertices.at(i + 1));
-		vertices_3D.push_back(g_vertices.at(i + 2) + unit_z_length);
+		glm::vec4 target = glm::vec4(g_vertices.at(i), g_vertices.at(i + 1), g_vertices.at(i + 2), 1);
+		glm::vec4 transvec = ruleMat * target;
+		vertices_3D.push_back(transvec[0]);
+		vertices_3D.push_back(transvec[1]);
+		vertices_3D.push_back(transvec[2]);
+
 		vertices_3D.push_back(g_vertices.at(i + 3));
 		vertices_3D.push_back(g_vertices.at(i + 4));
 		vertices_3D.push_back(g_vertices.at(i + 5));
@@ -487,6 +465,8 @@ vector<float> vertices2Dto3D(vector<float> g_vertices) {
 	float avg_x = total_x / (float)polygon_level;
 	float avg_y = total_y / (float)polygon_level;
 
+
+
 	vertices_3D.push_back(avg_x);
 	vertices_3D.push_back(avg_y);
 	vertices_3D.push_back(0);
@@ -494,9 +474,11 @@ vector<float> vertices2Dto3D(vector<float> g_vertices) {
 	vertices_3D.push_back(0);
 	vertices_3D.push_back(0);
 
-	vertices_3D.push_back(avg_x);
-	vertices_3D.push_back(avg_y);
-	vertices_3D.push_back(unit_z_length);
+	glm::vec4 target = glm::vec4(avg_x, avg_y, 0, 1);
+	glm::vec4 transvec = ruleMat * target;
+	vertices_3D.push_back(transvec[0]);
+	vertices_3D.push_back(transvec[1]);
+	vertices_3D.push_back(transvec[2]);
 	vertices_3D.push_back(0);
 	vertices_3D.push_back(0);
 	vertices_3D.push_back(0);
@@ -685,10 +667,6 @@ void myKey(unsigned char key, int x, int y) {
 		}
 	}
 
-
-	
-
-
 	glutPostRedisplay();
 }
 void main(int argc, char **argv)
@@ -730,8 +708,6 @@ void main(int argc, char **argv)
 	//Create Vertex Buffer
 	//GLuint VertexBufferID;
 	glGenBuffers(2, VertexBufferID);
-
-
 
 	GLuint posLoc;
 
