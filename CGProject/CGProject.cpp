@@ -80,9 +80,17 @@ bool isMoved[2] = { false, false };
 int x_rotate_count = 0;
 int y_rotate_count = 0;
 
-vector<byte> LineLoopToUnitObj();
+int tesselLevel = 0;
+
+int scale = 1;
+int polygon_level = 0;
+
+
+vector<byte> indices2Dto3D();
 
 vector<byte> indices;
+
+vector<vector<float>> tesselVec;
 
 //Cube
 float vtxData[] = {
@@ -112,6 +120,7 @@ byte idxData[] = {
 	4,6,5
 };
 
+vector<float> vertices2Dto3D(vector<float> g_vertices);
 
 GLuint LoadShaders(const char* vertex_file_path, const char* fragment_file_path)
 {
@@ -195,12 +204,11 @@ GLuint LoadShaders(const char* vertex_file_path, const char* fragment_file_path)
 
 void changeUnitLength(int dir) {
 	if (is3D) {
-		
 		if (dir == PLUS)
 			unit_z_length += 0.2;
 		else
 			unit_z_length -= 0.2;
-		for (int i = (g_vertices.size()-12) / 2 + 2; i < g_vertices.size() - 12; i += 6) {
+		for (int i = (g_vertices.size() - 12) / 2 + 2; i < g_vertices.size() - 12; i += 6) {
 			g_vertices.at(i) = unit_z_length;
 		}
 		g_vertices.at(g_vertices.size() - 1 - 3) = unit_z_length;
@@ -208,6 +216,68 @@ void changeUnitLength(int dir) {
 }
 void Addtessel() {
 
+
+	glm::mat4 moveMat = glm::translate(glm::mat4(), glm::vec3(0, 0, unit_z_length));
+	vector<float> new_vertices;
+
+	int last = tesselVec.size() - 1;
+
+	for (int i = 0; i < polygon_level * 6 * 2 + 12; i += 6) {
+		glm::vec4 target = glm::vec4(tesselVec.at(last).at(i), tesselVec.at(last).at(i+1), tesselVec.at(last).at(i+2), 1);
+		glm::vec4 transvec = moveMat * target;
+		new_vertices.push_back(transvec[0]);
+		new_vertices.push_back(transvec[1]);
+		new_vertices.push_back(transvec[2]);
+
+		new_vertices.push_back(tesselVec.at(last).at(i + 3));
+		new_vertices.push_back(tesselVec.at(last).at(i + 4));
+		new_vertices.push_back(tesselVec.at(last).at(i + 5));
+
+	}
+	////후면 정보 복사
+	//for (int i = polygon_level * 6; i < polygon_level * 2 * 6; i ++){
+	//	new_vertices.push_back(tesselVec.at(last).at(i));
+	//}
+	//
+	////후면 정보를 앞면으로 하여 후면 생성
+	//for (int i = 0; i < polygon_level * 6; i+= 6) {
+	//	glm::vec4 target = glm::vec4(new_vertices.at(i), new_vertices.at(i+1), new_vertices.at(i+2), 1);
+	//	glm::vec4 transvec = moveMat * target;
+	//	new_vertices.push_back(transvec[0]);
+	//	new_vertices.push_back(transvec[1]);
+	//	new_vertices.push_back(transvec[2]);
+
+	//	new_vertices.push_back(new_vertices.at(i + 3));
+	//	new_vertices.push_back(new_vertices.at(i + 4));
+	//	new_vertices.push_back(new_vertices.at(i + 5));
+	//}
+
+	////calculate center of front and back (average)
+	////기존 후면 average
+	//for (int i = polygon_level * 2 * 6; i < ( polygon_level * 2 * 6 )+ 6; i++) {
+	//	new_vertices.push_back(tesselVec.at(last).at(i));
+	//}
+	////후면 average로 부터 이동된 새로운 후면 average
+	//glm::vec4 target = glm::vec4(new_vertices.at(polygon_level * 2 * 6), new_vertices.at(polygon_level * 2 * 6 + 1), new_vertices.at(polygon_level * 2 * 6 + 2), 1);
+	//glm::vec4 transvec = moveMat * target;
+	//new_vertices.push_back(transvec[0]);
+	//new_vertices.push_back(transvec[1]);
+	//new_vertices.push_back(transvec[2]);
+	//new_vertices.push_back(0);
+	//new_vertices.push_back(0);
+	//new_vertices.push_back(0);
+
+	tesselVec.push_back(new_vertices);
+	glutPostRedisplay();
+}
+void RemoveTessel() {
+	if (tesselVec.size() > 1)
+		tesselVec.pop_back();
+	
+	glutPostRedisplay();
+}
+void scaling() {
+	glm::scale(glm::mat4(), glm::vec3(scale, scale, scale));
 }
 
 void rotate(int direction, int sign) {
@@ -245,8 +315,7 @@ void rotate(float ax_x, float ax_y, float ax_z) {
 	M[1] = glm::vec4(y, 0);
 	M[2] = glm::vec4(z, 0);
 	M[3] = glm::vec4(0, 0, 0, 1);*/
-
-
+	
 	//glm::vec3 Z = glm::vec3(nx, ny,nx+ny);//바라보는 방향?
 	//Z= glm::normalize(Z);
 	//glm::vec3 Xp = glm::vec3(1, 1, 1);//도는 기준 선
@@ -326,15 +395,20 @@ void renderScene(void)
 	else {
 
 		if (!is3D) {
-			indices = LineLoopToUnitObj();
+			//g_vertices = vertices2Dto3D(g_vertices);
+			indices = indices2Dto3D();
+			tesselVec.push_back(g_vertices);
 			is3D = true;
 		}
-		glBufferData(GL_ARRAY_BUFFER, sizeof(float)*g_vertices.size(), g_vertices.data(), GL_STATIC_DRAW);
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(byte) * indices.size(), indices.data(), GL_STATIC_DRAW);
-		/*glBufferData(GL_ARRAY_BUFFER, sizeof(float)*6*8, vtxData, GL_STATIC_DRAW);
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(byte) * 3 * 2 * 6, idxData, GL_STATIC_DRAW);*/
-		glDrawElements(GL_TRIANGLES, sizeof(byte) * indices.size(), GL_UNSIGNED_BYTE, 0);
-		/*glDrawElements(GL_TRIANGLES, sizeof(byte) * 3 * 2 * 6, GL_UNSIGNED_BYTE, 0);*/
+
+		for (int i = 0; i < tesselVec.size(); i++) {
+			glBufferData(GL_ARRAY_BUFFER, sizeof(float)*tesselVec.at(i).size(), tesselVec.at(i).data(), GL_STATIC_DRAW);
+			glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(byte) * indices.size(), indices.data(), GL_STATIC_DRAW);
+			/*glBufferData(GL_ARRAY_BUFFER, sizeof(float)*6*8, vtxData, GL_STATIC_DRAW);
+			glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(byte) * 3 * 2 * 6, idxData, GL_STATIC_DRAW);*/
+			glDrawElements(GL_TRIANGLES, sizeof(byte) * indices.size(), GL_UNSIGNED_BYTE, 0);
+			/*glDrawElements(GL_TRIANGLES, sizeof(byte) * 3 * 2 * 6, GL_UNSIGNED_BYTE, 0);*/
+		}
 	}
 	//glUniformMatrix4fv(moveLoc, 1, GL_FALSE, iMat);
 
@@ -345,18 +419,26 @@ void renderScene(void)
 	glutSwapBuffers();
 }
 
-vector<byte> LineLoopToUnitObj() {
-	int polygon_level = g_vertices.size() / 6;
+vector<float> vertices2Dto3D(vector<float> g_vertices) {
+
+	vector<float> vertices_3D;
+	
+	for (int i = 0; i < g_vertices.size(); i++) {
+		vertices_3D.push_back(g_vertices.at(i));
+	}
+
+
+	polygon_level = g_vertices.size() / 6;
 	int initial_size = g_vertices.size();
 	//create back area
 	for (int i = 0; i < initial_size; i += 6) {
-		g_vertices.push_back(g_vertices.at(i));
-		g_vertices.push_back(g_vertices.at(i + 1));
-		g_vertices.push_back(g_vertices.at(i + 2) + unit_z_length);
-		g_vertices.push_back(g_vertices.at(i + 3));
-		g_vertices.push_back(g_vertices.at(i + 4));
-		g_vertices.push_back(g_vertices.at(i + 5));
-		
+		vertices_3D.push_back(g_vertices.at(i));
+		vertices_3D.push_back(g_vertices.at(i + 1));
+		vertices_3D.push_back(g_vertices.at(i + 2) + unit_z_length);
+		vertices_3D.push_back(g_vertices.at(i + 3));
+		vertices_3D.push_back(g_vertices.at(i + 4));
+		vertices_3D.push_back(g_vertices.at(i + 5));
+
 	}
 
 	//calculate center of front and back (average)
@@ -366,22 +448,31 @@ vector<byte> LineLoopToUnitObj() {
 		total_x += g_vertices.at(i);
 		total_y += g_vertices.at(i + 1);
 	}
-	float avg_x = total_x/(float)polygon_level;
-	float avg_y = total_y/(float)polygon_level;
+	float avg_x = total_x / (float)polygon_level;
+	float avg_y = total_y / (float)polygon_level;
 
-	g_vertices.push_back(avg_x);
-	g_vertices.push_back(avg_y);
-	g_vertices.push_back(0);
-	g_vertices.push_back(0);
-	g_vertices.push_back(0);
-	g_vertices.push_back(0);
+	vertices_3D.push_back(avg_x);
+	vertices_3D.push_back(avg_y);
+	vertices_3D.push_back(0);
+	vertices_3D.push_back(0);
+	vertices_3D.push_back(0);
+	vertices_3D.push_back(0);
 
-	g_vertices.push_back(avg_x);
-	g_vertices.push_back(avg_y);
-	g_vertices.push_back(unit_z_length);
-	g_vertices.push_back(0);
-	g_vertices.push_back(0);
-	g_vertices.push_back(0);
+	vertices_3D.push_back(avg_x);
+	vertices_3D.push_back(avg_y);
+	vertices_3D.push_back(unit_z_length);
+	vertices_3D.push_back(0);
+	vertices_3D.push_back(0);
+	vertices_3D.push_back(0);
+
+	return vertices_3D;
+}
+
+vector<byte> indices2Dto3D() {
+	polygon_level = (g_vertices.size()) / 6;
+	int initial_size = g_vertices.size();
+
+	g_vertices = vertices2Dto3D(g_vertices);
 
 	vector<byte> indices;
 
@@ -461,6 +552,10 @@ void specialKey(int key, int x, int y) {
 	case GLUT_KEY_UP: rotate(X_DIR,1);
 		break;
 	case GLUT_KEY_DOWN: rotate(X_DIR,-1);
+		break;
+	case GLUT_KEY_PAGE_UP: Addtessel();
+		break;
+	case GLUT_KEY_PAGE_DOWN: RemoveTessel();
 		break;
 	}
 
