@@ -11,11 +11,11 @@ out vec3 oColor;
 
 uniform mat4 rot;
 uniform mat4 move;
-
+uniform mat4 scale;
 
 void main()
 {
-    gl_Position = move*rot*vec4(pos, 1.0);
+    gl_Position = move*rot*scale*vec4(pos, 2.0);
     //gl_PointSize = pSize;
 	gl_PointSize = 20.0;
 	oColor = iColor;

@@ -29,6 +29,11 @@ using namespace std;
 #define PLUS 1
 #define MINUS 2
 
+#define LEFT 0
+#define RIGHT 1
+#define UP 2
+#define DOWN 3
+
 GLuint g_programID;
 
 
@@ -47,10 +52,13 @@ vector<byte*> g_indices;
 
 bool is2D = true;
 bool is3D = false;
+bool isUnitDone = false;
 
 vector<glm::mat4x4> mat_vec;
 
-glm::mat4 M;
+glm::mat4 rotateM;
+glm::mat4 scaleM;
+glm::mat4 moveM;
 //x 로 -0.5 이동한 행렬
 GLfloat matv[2][16] = {
 	{
@@ -276,20 +284,43 @@ void RemoveTessel() {
 	
 	glutPostRedisplay();
 }
-void scaling() {
-	glm::scale(glm::mat4(), glm::vec3(scale, scale, scale));
+void scaling(int sign) {
+	if (sign == 0)
+		scale++;
+	else if(scale > 1)
+		scale--;
+	
+	scaleM = glm::scale(glm::mat4(), glm::vec3(scale, scale, scale));
+}
+void translation(int direction) {
+	glm::mat4 move;
+	switch (direction) {
+	case LEFT:
+		move = glm::translate(glm::mat4(), glm::vec3(-0.2,0,0));
+		break;
+	case RIGHT:
+		move = glm::translate(glm::mat4(), glm::vec3(0.2, 0, 0));
+		break;
+	case UP:
+		move = glm::translate(glm::mat4(), glm::vec3(0, 0.2, 0));
+		break;
+	case DOWN:
+		move = glm::translate(glm::mat4(), glm::vec3(0, -0.2, 0));
+		break;
+	}
+	moveM *= move;
 }
 
 void rotate(int direction, int sign) {
 	switch (direction) {
 	case X_DIR:
-		M *= glm::rotate(glm::mat4(), glm::radians(sign * 10.0f), glm::vec3(1, 0, 0));
+		rotateM *= glm::rotate(glm::mat4(), glm::radians(sign * 10.0f), glm::vec3(1, 0, 0));
 		break;
 	case Y_DIR:
-		M *= glm::rotate(glm::mat4(), glm::radians(sign * 10.0f), glm::vec3(0, 1, 0));
+		rotateM *= glm::rotate(glm::mat4(), glm::radians(sign * 10.0f), glm::vec3(0, 1, 0));
 		break;
 	case Z_DIR:
-		M *= glm::rotate(glm::mat4(), glm::radians(sign * 10.0f), glm::vec3(0, 0, 1));
+		rotateM *= glm::rotate(glm::mat4(), glm::radians(sign * 10.0f), glm::vec3(0, 0, 1));
 		break;
 	}
 	
@@ -311,10 +342,10 @@ void rotate(float ax_x, float ax_y, float ax_z) {
 	y = glm::normalize(y);
 	x = glm::normalize(x);
 
-	M[0] = glm::vec4(x, 0);
-	M[1] = glm::vec4(y, 0);
-	M[2] = glm::vec4(z, 0);
-	M[3] = glm::vec4(0, 0, 0, 1);*/
+	rotateM[0] = glm::vec4(x, 0);
+	rotateM[1] = glm::vec4(y, 0);
+	rotateM[2] = glm::vec4(z, 0);
+	rotateM[3] = glm::vec4(0, 0, 0, 1);*/
 	
 	//glm::vec3 Z = glm::vec3(nx, ny,nx+ny);//바라보는 방향?
 	//Z= glm::normalize(Z);
@@ -379,13 +410,18 @@ void renderScene(void)
 	
 	//회전
 	GLuint axisLoc = glGetUniformLocation(g_programID, "rot");
-	glUniformMatrix4fv(axisLoc, 1, GL_FALSE, &M[0][0]);
+	glUniformMatrix4fv(axisLoc, 1, GL_FALSE, &rotateM[0][0]);
+
+	//scale
+	GLuint scaleLoc = glGetUniformLocation(g_programID, "scale");
+	glUniformMatrix4fv(scaleLoc, 1, GL_FALSE, &scaleM[0][0]);
 
 
 	GLuint moveLoc = glGetUniformLocation(g_programID, "move");
+	glUniformMatrix4fv(moveLoc, 1, GL_FALSE, &moveM[0][0]);
+
 	GLuint colLoc = glGetAttribLocation(g_programID, "iColor");
 	
-	glUniformMatrix4fv(moveLoc, 1, GL_FALSE, matv[0]);
 	
 	//2D Line Loop
 	if (is2D) {
@@ -544,26 +580,48 @@ void init()
 }
 
 void specialKey(int key, int x, int y) {  
-	switch (key) {
-	case GLUT_KEY_LEFT: rotate(Y_DIR,-1);
-		break;
-	case GLUT_KEY_RIGHT: rotate(Y_DIR,1);
-		break;
-	case GLUT_KEY_UP: rotate(X_DIR,1);
-		break;
-	case GLUT_KEY_DOWN: rotate(X_DIR,-1);
-		break;
-	case GLUT_KEY_PAGE_UP: Addtessel();
-		break;
-	case GLUT_KEY_PAGE_DOWN: RemoveTessel();
-		break;
+
+	if (!isUnitDone) {
+		switch (key) {
+		case GLUT_KEY_LEFT: rotate(Y_DIR, -1);
+			break;
+		case GLUT_KEY_RIGHT: rotate(Y_DIR, 1);
+			break;
+		case GLUT_KEY_UP: rotate(X_DIR, 1);
+			break;
+		case GLUT_KEY_DOWN: rotate(X_DIR, -1);
+			break;
+		}
+	}
+	else {
+		switch (key) {
+		case GLUT_KEY_LEFT: translation(LEFT);
+			break;
+		case GLUT_KEY_RIGHT: translation(RIGHT);
+			break;
+		case GLUT_KEY_UP: translation(UP);
+			break;
+		case GLUT_KEY_DOWN: translation(DOWN);
+			break;
+		case GLUT_KEY_PAGE_UP: Addtessel();
+			break;
+		case GLUT_KEY_PAGE_DOWN: RemoveTessel();
+			break;
+		}
 	}
 
 
 	glutPostRedisplay();
 }  
 void myKey(unsigned char key, int x, int y) {
-	
+
+	if (key == 13) {
+		if (is2D)
+			is2D = false;
+		else if (is3D)
+			isUnitDone = true;
+	}
+
 	if (key == 'q' || key == 'w' || key == 'a' || key == 's' || key == 'z' || key == 'x') {
 		isMoved[0] = true;
 		isMoved[1] = false;
@@ -599,10 +657,37 @@ void myKey(unsigned char key, int x, int y) {
 		break;
 	}
 
-	if (key == '+')
-		changeUnitLength(PLUS);
-	else if (key == '-')
-		changeUnitLength(MINUS);
+	if (key == '+') {
+		if (!isUnitDone)
+			changeUnitLength(PLUS);
+		else
+			scaling(0);
+	}
+	else if (key == '-') {
+		if(!isUnitDone)
+			changeUnitLength(MINUS);
+		else
+			scaling(1);
+	}
+
+	if (key == '8' || key == '6' || key == '4' || key == '2') {
+		if (isUnitDone) {
+			switch (key) {
+			case '4': rotate(Y_DIR, -1);
+				break;
+			case '6': rotate(Y_DIR, 1);
+				break;
+			case '8': rotate(X_DIR, 1);
+				break;
+			case '2': rotate(X_DIR, -1);
+				break;
+			}
+		}
+	}
+
+
+	
+
 
 	glutPostRedisplay();
 }
